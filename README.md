@@ -29,23 +29,15 @@ To scan open ports on a target host, use the following command:
 
 ```bash
 go run portscanner.go
-host: example.com
-ports: 1-1024
+URL/IP: example.com/192.168.1.1
+ports: 1-1000
 ```
 
-Replace 'example.com' with the target hostname.
+Replace 'example.com' with the target URL / Replace '192.168.1.1' with the target IP.
 
 
 Adjust the port range as needed.
 
-## Options
--host: Specify the target hostname (required).
-
-
--ports: Specify the port range to scan (e.g., 1-1024 or 80,443).
-
-
--timeout: Set the connection timeout in seconds (default is 2 seconds).
 
 ## Results
-After scanning is complete, PortScanner will provide a list of open ports on the specified host.
+After scanning is complete, PortScanner will provide a list of open ports on the specified URL or IP.
