@@ -16,22 +16,31 @@ type ScanResult struct {
 	Port   int
 	Type   string
 	Status string
+	Banner string // Banner grabbing result
 }
 
 func scanPort(host string, port int, results chan ScanResult, wg *sync.WaitGroup) {
 	defer wg.Done()
 	address := fmt.Sprintf("%s:%d", host, port)
-	_, err := net.DialTimeout("tcp", address, 2*time.Second)
+	conn, err := net.DialTimeout("tcp", address, 2*time.Second)
 
 	portType := "TCP"
 	status := "closed"
+	banner := ""
 
 	if err == nil {
 		portType = "TCP"
 		status = "open"
+		// Attempt banner grabbing
+		conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		n, err := conn.Read([]byte{})
+		if err == nil {
+			banner = fmt.Sprintf("Banner: %s", string([]byte{}[:n]))
+		}
+		conn.Close()
 	}
 
-	results <- ScanResult{Host: host, Port: port, Type: portType, Status: status}
+	results <- ScanResult{Host: host, Port: port, Type: portType, Status: status, Banner: banner}
 }
 
 func main() {
@@ -39,9 +48,9 @@ func main() {
 	var openPorts []ScanResult
 
 	target := getUserInput("Enter URL or IP to scan: ")
-	portCount := getUserInputInt("Enter the number of ports to scan (e.g., 1000): ")
+	portCount := getUserInputInt("Enter the number of ports to scan (e.g., 1000):")
 
-	fmt.Printf("+++ Port scanning started for %s (TCP ports 1-%d)...", target, portCount)
+	fmt.Printf("+++ Port scanning started for %s (TCP ports 1-%d)...\n", target, portCount)
 
 	var wg sync.WaitGroup
 
@@ -77,6 +86,9 @@ func main() {
 		}
 		openPortText := fmt.Sprintf("Port number %d is open (%s)", result.Port, result.Type)
 		color.Green(openPortText) // Display open ports in green
+		if result.Banner != "" {
+			fmt.Println(result.Banner)
+		}
 	}
 }
 
