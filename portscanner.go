@@ -89,7 +89,21 @@ func main() {
 		if result.Banner != "" {
 			fmt.Println(result.Banner)
 		}
+
+		// Check for known vulnerabilities or services
+		if service, ok := vulnerabilities[result.Port]; ok {
+			fmt.Printf("Known Service: %s\n", service)
+		}
 	}
+}
+
+// Define a map of known vulnerabilities or services associated with port numbers
+var vulnerabilities = map[int]string{
+	22:   "SSH",
+	80:   "HTTP",
+	443:  "HTTPS",
+	3306: "MySQL",
+	// Add more ports and descriptions as needed
 }
 
 func getUserInput(prompt string) string {
