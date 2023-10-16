@@ -50,6 +50,16 @@ func main() {
 	target := getUserInput("Enter URL or IP to scan: ")
 	portCount := getUserInputInt("Enter the number of ports to scan (e.g., 1000):")
 
+	// Perform a DNS lookup to get the IP address of the target
+	ips, err := net.LookupHost(target)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	// Display the IP address
+	fmt.Printf("+++ Target: %s (IP Address: %s)\n", target, ips[0])
+
 	fmt.Printf("+++ Port scanning started for %s (TCP ports 1-%d)...\n", target, portCount)
 
 	var wg sync.WaitGroup
