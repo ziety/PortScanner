@@ -11,57 +11,48 @@ import (
 	"github.com/fatih/color"
 )
 
+const (
+	maxDialTimeout   = 2 * time.Second
+	maxReadTimeout   = 2 * time.Second
+	defaultPortRange = 1000
+)
+
 type ScanResult struct {
 	Host   string
 	Port   int
 	Type   string
 	Status string
-	Banner string // Banner grabbing result
+	Banner string
 }
 
-func scanPort(host string, port int, results chan ScanResult, wg *sync.WaitGroup) {
-	defer wg.Done()
-	address := fmt.Sprintf("%s:%d", host, port)
-	conn, err := net.DialTimeout("tcp", address, 2*time.Second)
-
-	portType := "TCP"
-	status := "closed"
-	banner := ""
-
-	if err == nil {
-		portType = "TCP"
-		status = "open"
-		// Attempt banner grabbing
-		conn.SetReadDeadline(time.Now().Add(2 * time.Second))
-		n, err := conn.Read([]byte{})
-		if err == nil {
-			banner = fmt.Sprintf("Banner: %s", string([]byte{}[:n]))
-		}
-		conn.Close()
-	}
-
-	results <- ScanResult{Host: host, Port: port, Type: portType, Status: status, Banner: banner}
+var vulnerabilities = map[int]string{
+	22:   "SSH",
+	80:   "HTTP",
+	443:  "HTTPS",
+	3306: "MySQL",
+	// Add more ports and descriptions as needed
 }
 
 func main() {
-	results := make(chan ScanResult)
-	var openPorts []ScanResult
-
 	target := getUserInput("Enter URL or IP to scan: ")
 	portCount := getUserInputInt("Enter the number of ports to scan (e.g., 1000):")
 
-	// Perform a DNS lookup to get the IP address of the target
 	ips, err := net.LookupHost(target)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
 
-	// Display the IP address
 	fmt.Printf("+++ Target: %s (IP Address: %s)\n", target, ips[0])
-
 	fmt.Printf("+++ Port scanning started for %s (TCP ports 1-%d)...\n", target, portCount)
 
+	results := scanPorts(target, portCount)
+	printScanResults(results)
+}
+
+func scanPorts(target string, portCount int) []ScanResult {
+	results := make(chan ScanResult)
+	var openPorts []ScanResult
 	var wg sync.WaitGroup
 
 	for port := 1; port <= portCount; port++ {
@@ -80,6 +71,10 @@ func main() {
 		}
 	}
 
+	return openPorts
+}
+
+func printScanResults(openPorts []ScanResult) {
 	fmt.Println("+++ Scanning has been done!")
 	fmt.Println("+++ Open Ports -->")
 
@@ -95,25 +90,38 @@ func main() {
 			currentHost = result.Host
 		}
 		openPortText := fmt.Sprintf("Port number %d is open (%s)", result.Port, result.Type)
-		color.Green(openPortText) // Display open ports in green
+		color.Green(openPortText)
 		if result.Banner != "" {
 			fmt.Println(result.Banner)
 		}
 
-		// Check for known vulnerabilities or services
 		if service, ok := vulnerabilities[result.Port]; ok {
 			fmt.Printf("Known Service: %s\n", service)
 		}
 	}
 }
 
-// Define a map of known vulnerabilities or services associated with port numbers
-var vulnerabilities = map[int]string{
-	22:   "SSH",
-	80:   "HTTP",
-	443:  "HTTPS",
-	3306: "MySQL",
-	// Add more ports and descriptions as needed
+func scanPort(host string, port int, results chan ScanResult, wg *sync.WaitGroup) {
+	defer wg.Done()
+	address := fmt.Sprintf("%s:%d", host, port)
+	conn, err := net.DialTimeout("tcp", address, maxDialTimeout)
+
+	portType := "TCP"
+	status := "closed"
+	banner := ""
+
+	if err == nil {
+		portType = "TCP"
+		status = "open"
+		conn.SetReadDeadline(time.Now().Add(maxReadTimeout))
+		n, err := conn.Read([]byte{})
+		if err == nil {
+			banner = fmt.Sprintf("Banner: %s", string([]byte{}[:n]))
+		}
+		conn.Close()
+	}
+
+	results <- ScanResult{Host: host, Port: port, Type: portType, Status: status, Banner: banner}
 }
 
 func getUserInput(prompt string) string {
@@ -131,7 +139,6 @@ func getUserInputInt(prompt string) int {
 }
 
 func sortScanResults(results []ScanResult) {
-	// Sort openPorts in ascending order.
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Port < results[j].Port
 	})
