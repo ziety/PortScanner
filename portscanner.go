@@ -18,11 +18,14 @@ const (
 )
 
 type ScanResult struct {
-	Host   string
-	Port   int
-	Type   string
-	Status string
-	Banner string
+	Host     string
+	Port     int
+	Type     string
+	Status   string
+	Banner   string
+	Vulns    []string
+	Exploit  string
+	WebVulns []string
 }
 
 var vulnerabilities = map[int]string{
@@ -36,6 +39,7 @@ var vulnerabilities = map[int]string{
 func main() {
 	target := getUserInput("Enter URL or IP to scan: ")
 	portCount := getUserInputInt("Enter the number of ports to scan (e.g., 1000):")
+	continuous := getUserInput("Enable continuous scanning? (yes/no):")
 
 	ips, err := net.LookupHost(target)
 	if err != nil {
@@ -46,8 +50,16 @@ func main() {
 	fmt.Printf("+++ Target: %s (IP Address: %s)\n", target, ips[0])
 	fmt.Printf("+++ Port scanning started for %s (TCP ports 1-%d)...\n", target, portCount)
 
-	results := scanPorts(target, portCount)
-	printScanResults(results)
+	for {
+		results := scanPorts(target, portCount)
+		printScanResults(results)
+
+		if strings.ToLower(continuous) != "yes" {
+			break
+		}
+
+		time.Sleep(5 * time.Minute) // Sleep for 5 minutes before the next scan
+	}
 }
 
 func scanPorts(target string, portCount int) []ScanResult {
@@ -95,8 +107,23 @@ func printScanResults(openPorts []ScanResult) {
 			fmt.Println(result.Banner)
 		}
 
-		if service, ok := vulnerabilities[result.Port]; ok {
-			fmt.Printf("Known Service: %s\n", service)
+		if len(result.Vulns) > 0 {
+			fmt.Println("Vulnerabilities:")
+			for _, vuln := range result.Vulns {
+				fmt.Printf("- %s\n", vuln)
+			}
+		}
+
+		if result.Exploit != "" {
+			fmt.Println("Exploitation:")
+			fmt.Printf("- %s\n", result.Exploit)
+		}
+
+		if len(result.WebVulns) > 0 {
+			fmt.Println("Web Application Vulnerabilities:")
+			for _, webVuln := range result.WebVulns {
+				fmt.Printf("- %s\n", webVuln)
+			}
 		}
 	}
 }
@@ -109,6 +136,9 @@ func scanPort(host string, port int, results chan ScanResult, wg *sync.WaitGroup
 	portType := "TCP"
 	status := "closed"
 	banner := ""
+	vulns := []string{}
+	exploit := ""
+	webVulns := []string{}
 
 	if err == nil {
 		portType = "TCP"
@@ -119,9 +149,24 @@ func scanPort(host string, port int, results chan ScanResult, wg *sync.WaitGroup
 			banner = fmt.Sprintf("Banner: %s", string([]byte{}[:n]))
 		}
 		conn.Close()
+
+		if service, ok := vulnerabilities[port]; ok {
+			vulns, exploit = checkForVulnerabilities(service, banner)
+		}
+
+		webVulns = checkWebApplicationVulnerabilities(fmt.Sprintf("http://%s:%d", host, port))
 	}
 
-	results <- ScanResult{Host: host, Port: port, Type: portType, Status: status, Banner: banner}
+	results <- ScanResult{
+		Host:     host,
+		Port:     port,
+		Type:     portType,
+		Status:   status,
+		Banner:   banner,
+		Vulns:    vulns,
+		Exploit:  exploit,
+		WebVulns: webVulns,
+	}
 }
 
 func getUserInput(prompt string) string {
@@ -142,4 +187,40 @@ func sortScanResults(results []ScanResult) {
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Port < results[j].Port
 	})
+}
+
+func checkForVulnerabilities(service, banner string) ([]string, string) {
+	vulns := []string{}
+	exploit := ""
+
+	if service == "SSH" {
+		if strings.Contains(banner, "OpenSSH") {
+			vulns = append(vulns, "OpenSSH Vulnerability")
+			exploit = "Exploitation for OpenSSH Vulnerability"
+		}
+	}
+
+	return vulns, exploit
+}
+
+func checkWebApplicationVulnerabilities(url string) []string {
+	webVulns := []string{}
+
+	if checkXSSVulnerability(url) {
+		webVulns = append(webVulns, "Cross-Site Scripting (XSS) Vulnerability")
+	}
+
+	return webVulns
+}
+
+func checkXSSVulnerability(url string) bool {
+	return false
+}
+
+func checkSQLInjectionVulnerability(url string) bool {
+	return false
+}
+
+func checkOtherWebVulnerability(url string) bool {
+	return false
 }
