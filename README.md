@@ -30,7 +30,7 @@ To scan open ports on a target host, use the following command:
 ```bash
 go run portscanner.go
 URL: example.com
-IP: 192.168.1.1
+IP: 192.168.1.1 
 ports: 1-1000
 ```
 
