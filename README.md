@@ -1,4 +1,4 @@
-# PortScanner
+# PortScanner 
 
 PortScanner is a simple and efficient command-line tool for scanning open ports on a target host. Written in Go, it allows you to quickly identify open ports, making it a valuable asset for network administrators, security professionals, and developers.
 
